@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "LottieSplashExample",
+    "slug": "expo-lottie-splash-screen-example",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.deepanshucse.lottiesplashexample"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1A1A2E"
+      },
+      "package": "com.deepanshucse.lottiesplashexample"
+    },
+    "plugins": [
+      [
+        "expo-lottie-splash-screen",
+        {
+          "animationFile": "./assets/splash.json",
+          "backgroundColor": "#1A1A2E",
+          "autoHide": false
+        }
+      ]
+    ]
+  }
+}

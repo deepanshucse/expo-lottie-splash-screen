@@ -1,0 +1,10 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["ExpoLottieSplashScreenModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.lottiesplashscreen.ExpoLottieSplashScreenModule"]
+  }
+}
+

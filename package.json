@@ -1,0 +1,64 @@
+{
+  "name": "expo-lottie-splash-screen",
+  "version": "0.1.0",
+  "description": "Native Lottie splash screen for Expo — Android & iOS",
+  "main": "build/index.js",
+  "types": "build/index.d.ts",
+  "app.plugin": "app.plugin.js",
+  "scripts": {
+    "build": "node internal/module_scripts/build.js",
+    "build:plugin": "tsc -p plugin/tsconfig.json",
+    "build:all": "npm run build && npm run build:plugin",
+    "clean": "node internal/module_scripts/clean.js",
+    "lint": "eslint src/",
+    "test": "node internal/module_scripts/test.js",
+    "prepare": "npm run build:all",
+    "open:ios": "node internal/module_scripts/open-ios.js",
+    "open:android": "node internal/module_scripts/open-android.js"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "lottie",
+    "splash-screen",
+    "splash",
+    "animation",
+    "native",
+    "android",
+    "ios"
+  ],
+  "repository": "https://github.com/deepanshucse/expo-lottie-splash-screen",
+  "bugs": {
+    "url": "https://github.com/deepanshucse/expo-lottie-splash-screen/issues"
+  },
+  "author": "Deepanshu Yadav <deepanshuyadav374@gmail.com> (https://github.com/deepanshucse)",
+  "license": "MIT",
+  "homepage": "https://github.com/deepanshucse/expo-lottie-splash-screen#readme",
+  "devDependencies": {
+    "@babel/core": "^7.26.0",
+    "@expo/config-plugins": "^9.1.7",
+    "@types/jest": "^29.2.1",
+    "@types/react": "~19.1.1",
+    "babel-preset-expo": "~55.0.8",
+    "eslint": "~9.39.4",
+    "eslint-config-universe": "^15.0.3",
+    "expo": "^57.0.11",
+    "jest": "^29.7.0",
+    "jest-expo": "~55.0.9",
+    "prettier": "^3.0.0",
+    "react-native": "0.82.1",
+    "typescript": "^5.9.2"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "roots": [
+      "<rootDir>/src"
+    ]
+  },
+  "peerDependencies": {
+    "expo": "*",
+    "react": "*",
+    "react-native": "*",
+    "@expo/config-plugins": "*"
+  }
+}

@@ -1,0 +1,28 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.lottiesplashscreen'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.lottiesplashscreen"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+    minSdkVersion 21
+  }
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  // Lottie for Android (LottieAnimationView extends AppCompatImageView)
+  implementation 'com.airbnb.android:lottie:6.4.0'
+  // AppCompat required — LottieAnimationView is a subclass of AppCompatImageView
+  implementation 'androidx.appcompat:appcompat:1.7.0'
+  // AndroidX SplashScreen API (backport for Android 12 SplashScreen on API 21+)
+  implementation 'androidx.core:core-splashscreen:1.0.1'
+}
