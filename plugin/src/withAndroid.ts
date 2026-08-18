@@ -15,21 +15,42 @@ interface PluginOptions {
   autoHide?: boolean;
 }
 
+/** Idempotent — inserts the LottieSplashScreenManager import after the `package` line, unless already present. */
+export function injectMainActivityImport(src: string): string {
+  const importLine = 'import expo.modules.lottiesplashscreen.LottieSplashScreenManager';
+  if (src.includes(importLine)) {
+    return src;
+  }
+  return src.replace(/^(package .+)/m, `$1\n\n${importLine}`);
+}
+
+/** Idempotent — inserts the `LottieSplashScreenManager.show(...)` call as the first statement of `onCreate`. */
+export function injectMainActivityShowCall(
+  src: string,
+  options: { autoHide: boolean; backgroundColor: string }
+): string {
+  const marker = 'LottieSplashScreenManager.show(';
+  if (src.includes(marker)) {
+    return src;
+  }
+
+  const autoHideStr = options.autoHide ? 'true' : 'false';
+  const showCall = `    LottieSplashScreenManager.show(this, "lottie_splash", ${autoHideStr}, false, "${options.backgroundColor}")\n`;
+
+  return src.replace(
+    /(override fun onCreate\(savedInstanceState: Bundle\?\) \{)/,
+    `$1\n${showCall}`
+  );
+}
+
 /**
  * 1. Copies the Lottie JSON file to android/app/src/main/res/raw/lottie_splash.json
  * 2. Patches styles.xml — overrides the splash theme Expo generates so our
  *    background colour replaces the splashscreen_logo on ALL Android versions.
  * 3. Patches MainActivity.kt to call LottieSplashScreenManager.show() in onCreate()
  */
-export const withAndroidLottieSplash: ConfigPlugin<PluginOptions> = (
-  config,
-  options
-) => {
-  const {
-    animationFile,
-    backgroundColor = '#ffffff',
-    autoHide = false,
-  } = options;
+export const withAndroidLottieSplash: ConfigPlugin<PluginOptions> = (config, options) => {
+  const { animationFile, backgroundColor = '#ffffff', autoHide = false } = options;
 
   // Step 1: Copy Lottie file to res/raw
   config = withDangerousMod(config, [
@@ -40,9 +61,7 @@ export const withAndroidLottieSplash: ConfigPlugin<PluginOptions> = (
 
       const srcFile = path.resolve(projectRoot, animationFile);
       if (!fs.existsSync(srcFile)) {
-        throw new Error(
-          `[expo-lottie-splash-screen] Animation file not found: ${srcFile}`
-        );
+        throw new Error(`[expo-lottie-splash-screen] Animation file not found: ${srcFile}`);
       }
 
       const rawDir = path.join(platformRoot, 'app', 'src', 'main', 'res', 'raw');
@@ -96,9 +115,7 @@ export const withAndroidLottieSplash: ConfigPlugin<PluginOptions> = (
     // BootTheme extends Theme.SplashScreen (AndroidX SplashScreen API).
     // Setting windowSplashScreenAnimatedIcon to a solid colour removes the
     // animated icon (the logo) on Android 12+.
-    styles.resources.style = styles.resources.style.filter(
-      (s: any) => s.$.name !== 'BootTheme'
-    );
+    styles.resources.style = styles.resources.style.filter((s: any) => s.$.name !== 'BootTheme');
 
     styles.resources.style.push({
       $: { name: 'BootTheme', parent: 'Theme.SplashScreen' },
@@ -139,9 +156,7 @@ export const withAndroidLottieSplash: ConfigPlugin<PluginOptions> = (
     if (!app) return config;
 
     const activities: any[] = app.activity ?? [];
-    const mainActivity = activities.find(
-      (a: any) => a.$?.['android:name'] === '.MainActivity'
-    );
+    const mainActivity = activities.find((a: any) => a.$?.['android:name'] === '.MainActivity');
 
     if (mainActivity) {
       mainActivity.$['android:theme'] = '@style/BootTheme';
@@ -153,29 +168,8 @@ export const withAndroidLottieSplash: ConfigPlugin<PluginOptions> = (
   //Step 4: Patch MainActivity.kt
   config = withMainActivity(config, (config) => {
     let src = config.modResults.contents;
-
-    // Add import if not already present
-    const importLine =
-      'import expo.modules.lottiesplashscreen.LottieSplashScreenManager';
-    if (!src.includes(importLine)) {
-      src = src.replace(
-        /^(package .+)/m,
-        `$1\n\n${importLine}`
-      );
-    }
-
-    // Inject show() call — idempotent
-    const marker = 'LottieSplashScreenManager.show(';
-    if (!src.includes(marker)) {
-      const autoHideStr = autoHide ? 'true' : 'false';
-      const showCall = `    LottieSplashScreenManager.show(this, "lottie_splash", ${autoHideStr}, false, "${backgroundColor}")\n`;
-
-      src = src.replace(
-        /(override fun onCreate\(savedInstanceState: Bundle\?\) \{)/,
-        `$1\n${showCall}`
-      );
-    }
-
+    src = injectMainActivityImport(src);
+    src = injectMainActivityShowCall(src, { autoHide, backgroundColor });
     config.modResults.contents = src;
     return config;
   });
