@@ -19,6 +19,10 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
 
+      # Trusted Publishing (OIDC) requires npm >= 11.5.1; setup-node's bundled
+      # npm on node 20 is older than that.
+      - run: npm install -g npm@latest
+
       - run: npm ci
 
       - name: Lint
@@ -47,7 +51,9 @@ jobs:
             exit 1
           fi
 
+      # Trusted Publishing: npm authenticates via this workflow's OIDC token
+      # (see the id-token: write permission above) once this repo/workflow is
+      # registered as a trusted publisher for the package on npmjs.com — no
+      # NPM_TOKEN secret needed.
       - name: Publish to npm
         run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
