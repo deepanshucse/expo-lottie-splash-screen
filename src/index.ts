@@ -1,5 +1,5 @@
 import { requireNativeModule } from 'expo';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated } from 'react-native';
 
 const NativeModule = requireNativeModule('ExpoLottieSplashScreen');
@@ -76,13 +76,15 @@ export function isVisible(): boolean {
  * });
  */
 export function useHideAnimation(config: UseHideAnimationConfig) {
-  const opacity = useRef(new Animated.Value(1)).current;
+  const [opacity] = useState(() => new Animated.Value(1));
   const { ready = true, animate } = config;
 
   // Store animate in a ref so changing the callback reference between renders
   // doesn't re-trigger the effect. Only `ready` should drive the hide sequence.
   const animateRef = useRef(animate);
-  animateRef.current = animate;
+  useEffect(() => {
+    animateRef.current = animate;
+  });
 
   // Guard: ensure the hide sequence only fires once per mount.
   const hasRun = useRef(false);
