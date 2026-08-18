@@ -8,7 +8,9 @@ A native Expo module that plays a **Lottie animation as your app's splash screen
 
 ---
 
-https://github.com/user-attachments/assets/sample_video.webm
+![Lottie animation playing as the native splash screen](.github/sample_video.gif)
+
+[▶ Watch the full-quality video](https://github.com/deepanshucse/expo-lottie-splash-screen/raw/main/.github/sample_video.webm)
 
 > Lottie animation playing as the native splash screen before the JS bundle loads.
 
