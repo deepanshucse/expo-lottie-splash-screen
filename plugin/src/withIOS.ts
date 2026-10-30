@@ -3,12 +3,86 @@ import {
   IOSConfig,
   withAppDelegate,
   withDangerousMod,
+  withInfoPlist,
   withXcodeProject,
 } from 'expo/config-plugins';
 import fs from 'fs';
 import path from 'path';
 
-import { ANIMATION_NAME, PluginOptions, resolveOptions } from './utils';
+import { ANIMATION_NAME, PluginOptions, Rgba, hexToRgba, resolveOptions } from './utils';
+
+/** Launch storyboard name; Expo's template already registers SplashScreen.storyboard in the Xcode project. */
+export const LAUNCH_STORYBOARD_NAME = 'SplashScreen';
+
+/** Named colour (asset catalog colour set) painted by the launch screen. Has a dark variant when `darkBackgroundColor` is set. */
+export const BACKGROUND_COLOR_ASSET = 'LottieSplashBackground';
+
+function colorComponents({ red, green, blue, alpha }: Rgba) {
+  return {
+    red: red.toFixed(3),
+    green: green.toFixed(3),
+    blue: blue.toFixed(3),
+    alpha: alpha.toFixed(3),
+  };
+}
+
+/** Contents.json of the background colour set, with a dark appearance when `darkHex` is given. */
+export function buildColorSetContents(lightHex: string, darkHex?: string): string {
+  const colors: object[] = [
+    {
+      idiom: 'universal',
+      color: { 'color-space': 'srgb', components: colorComponents(hexToRgba(lightHex)) },
+    },
+  ];
+  if (darkHex) {
+    colors.push({
+      idiom: 'universal',
+      appearances: [{ appearance: 'luminosity', value: 'dark' }],
+      color: { 'color-space': 'srgb', components: colorComponents(hexToRgba(darkHex)) },
+    });
+  }
+  return JSON.stringify({ colors, info: { author: 'expo', version: 1 } }, null, 2) + '\n';
+}
+
+/**
+ * A launch screen that is only the background colour — no logo — so iOS shows the same
+ * solid colour the Lottie overlay paints, instead of the template's white screen.
+ */
+export function buildLaunchStoryboard(lightHex: string): string {
+  // Interface Builder needs an inline fallback for the named colour; the asset catalog wins at runtime.
+  const { red, green, blue, alpha } = colorComponents(hexToRgba(lightHex));
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="24093.7" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="EXPO-VIEWCONTROLLER-1">
+    <device id="retina6_12" orientation="portrait" appearance="light"/>
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24053.1"/>
+        <capability name="Named colors" minToolsVersion="9.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <scene sceneID="EXPO-SCENE-1">
+            <objects>
+                <viewController storyboardIdentifier="SplashScreenViewController" id="EXPO-VIEWCONTROLLER-1" sceneMemberID="viewController">
+                    <view key="view" userInteractionEnabled="NO" contentMode="scaleToFill" insetsLayoutMarginsFromSafeArea="NO" id="EXPO-ContainerView" userLabel="ContainerView">
+                        <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                        <color key="backgroundColor" name="${BACKGROUND_COLOR_ASSET}"/>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="EXPO-PLACEHOLDER-1" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="0.0" y="0.0"/>
+        </scene>
+    </scenes>
+    <resources>
+        <namedColor name="${BACKGROUND_COLOR_ASSET}">
+            <color red="${red}" green="${green}" blue="${blue}" alpha="${alpha}" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+    </resources>
+</document>
+`;
+}
 
 /**
  * Idempotent — inserts `internal import ExpoLottieSplashScreen` after the first plain
@@ -93,7 +167,8 @@ export function injectAppDelegateShowCall(
 }
 
 /**
- * 1. Copies the Lottie JSON file into the iOS app bundle
+ * 1. Copies the Lottie JSON file into the iOS app bundle, and replaces the launch
+ *    screen with a logo-free one in the background colour (no white flash before the overlay)
  * 2. Patches AppDelegate.swift to call LottieSplashScreenManager.show() in
  *    application(_:didFinishLaunchingWithOptions:)
  *
@@ -124,6 +199,23 @@ export const withIosLottieSplash: ConfigPlugin<PluginOptions> = (config, options
       fs.mkdirSync(destDir, { recursive: true });
       fs.copyFileSync(srcFile, path.join(destDir, `${ANIMATION_NAME}.json`));
 
+      // Launch screen: solid background colour, no logo. The template's storyboard and
+      // Images.xcassets are already part of the Xcode project, so writing them is enough.
+      const colorSetDir = path.join(
+        destDir,
+        'Images.xcassets',
+        `${BACKGROUND_COLOR_ASSET}.colorset`
+      );
+      fs.mkdirSync(colorSetDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(colorSetDir, 'Contents.json'),
+        buildColorSetContents(backgroundColor, darkBackgroundColor)
+      );
+      fs.writeFileSync(
+        path.join(destDir, `${LAUNCH_STORYBOARD_NAME}.storyboard`),
+        buildLaunchStoryboard(backgroundColor)
+      );
+
       return config;
     },
   ]);
@@ -145,6 +237,11 @@ export const withIosLottieSplash: ConfigPlugin<PluginOptions> = (config, options
       });
     }
 
+    return config;
+  });
+
+  config = withInfoPlist(config, (config) => {
+    config.modResults.UILaunchStoryboardName = LAUNCH_STORYBOARD_NAME;
     return config;
   });
 

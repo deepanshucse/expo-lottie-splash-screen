@@ -137,7 +137,10 @@ The plugin automatically patches:
 
 **iOS**
 - Copies `lottie_splash.json` into the Xcode app bundle
+- Replaces `SplashScreen.storyboard` with a logo-free launch screen in your `backgroundColor`, via a `LottieSplashBackground` colour set (with a dark variant when `darkBackgroundColor` is set), so there's no white flash before the animation
 - Injects `LottieSplashScreenManager.show()` into `AppDelegate.swift`
+
+> iOS caches launch screens. If you still see the old one after changing colours, delete the app and reinstall it.
 
 > ⚠️ **Never manually edit `MainActivity.kt` or `AppDelegate.swift`** in a managed workflow — `expo prebuild --clean` will overwrite them. Use `app.json` plugin options instead.
 
@@ -349,6 +352,16 @@ On Android 12+ the system SplashScreen API shows briefly before our Lottie overl
 ### Using alongside `expo-splash-screen`
 
 You don't need `expo-splash-screen` — this library replaces it. If it's installed anyway (for example, another package depends on it), both libraries install the Android splash screen on the same activity. `expo-splash-screen` holds the window until React Native renders its first screen, so on Android the Lottie animation starts **after** your first screen is ready instead of before the JS bundle loads. Everything still works — the animation still plays in full and `hideAsync()` still resolves — it just starts later. Remove `expo-splash-screen` to get the earliest possible start.
+
+Both plugins write the iOS launch screen (`SplashScreen.storyboard`), so remove `expo-splash-screen` from `plugins` in `app.json` to make sure the launch screen matches your `backgroundColor`.
+
+### Touches are blocked while the splash is up
+
+Your app renders underneath the overlay while the animation plays. The overlay consumes touches on both platforms, so taps can't reach that hidden UI.
+
+### Expo Go and web
+
+The native module isn't included in Expo Go or on web. There the package doesn't throw on import; `isVisible()` returns `false` and `hideAsync()` resolves immediately. Use a development build to see the splash.
 
 ---
 

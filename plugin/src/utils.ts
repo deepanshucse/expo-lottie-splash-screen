@@ -35,6 +35,21 @@ export function normalizeHexColor(value: string, optionName: string): string {
   return `#${hex}`;
 }
 
+export interface Rgba {
+  red: number;
+  green: number;
+  blue: number;
+  alpha: number;
+}
+
+/** Splits a colour already normalised by `normalizeHexColor` into 0–1 components. */
+export function hexToRgba(hex: string): Rgba {
+  const digits = hex.replace('#', '');
+  const argb = digits.length === 8 ? digits : `FF${digits}`;
+  const channel = (i: number) => parseInt(argb.slice(i, i + 2), 16) / 255;
+  return { alpha: channel(0), red: channel(2), green: channel(4), blue: channel(6) };
+}
+
 export interface ResolvedOptions {
   animationFile: string;
   backgroundColor: string;

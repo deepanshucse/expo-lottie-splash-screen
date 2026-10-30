@@ -1,4 +1,10 @@
-import { injectAppDelegateImport, injectAppDelegateShowCall } from '../withIOS';
+import {
+  BACKGROUND_COLOR_ASSET,
+  buildColorSetContents,
+  buildLaunchStoryboard,
+  injectAppDelegateImport,
+  injectAppDelegateShowCall,
+} from '../withIOS';
 
 // Trimmed but structurally faithful to Expo SDK 57's generated AppDelegate.swift.
 // This is the exact shape that broke the plugin: it returns `super.application(...)`,
@@ -159,5 +165,40 @@ describe('injectAppDelegateShowCall', () => {
     expect(() => injectAppDelegateShowCall('class Foo {}\n', options)).toThrow(
       /didFinishLaunchingWithOptions/
     );
+  });
+});
+
+describe('buildColorSetContents', () => {
+  it('writes the light colour as sRGB components', () => {
+    const { colors } = JSON.parse(buildColorSetContents('#101312'));
+    expect(colors).toHaveLength(1);
+    expect(colors[0].color.components).toEqual({
+      red: '0.063',
+      green: '0.075',
+      blue: '0.071',
+      alpha: '1.000',
+    });
+  });
+
+  it('adds a dark appearance only when darkBackgroundColor is set', () => {
+    const { colors } = JSON.parse(buildColorSetContents('#FFFFFF', '#80000000'));
+    expect(colors).toHaveLength(2);
+    expect(colors[1].appearances).toEqual([{ appearance: 'luminosity', value: 'dark' }]);
+    expect(colors[1].color.components).toEqual({
+      red: '0.000',
+      green: '0.000',
+      blue: '0.000',
+      alpha: '0.502',
+    });
+  });
+});
+
+describe('buildLaunchStoryboard', () => {
+  it('is a logo-free launch screen painted with the background colour asset', () => {
+    const storyboard = buildLaunchStoryboard('#1A1A2E');
+    expect(storyboard).toContain('launchScreen="YES"');
+    expect(storyboard).toContain(`<color key="backgroundColor" name="${BACKGROUND_COLOR_ASSET}"/>`);
+    expect(storyboard).toContain(`<namedColor name="${BACKGROUND_COLOR_ASSET}">`);
+    expect(storyboard).not.toContain('imageView');
   });
 });

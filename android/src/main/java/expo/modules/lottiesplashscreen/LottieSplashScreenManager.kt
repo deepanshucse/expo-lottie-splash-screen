@@ -104,6 +104,10 @@ object LottieSplashScreenManager {
     private fun addOverlay(activity: Activity, animationName: String, loop: Boolean, bgColor: Int) {
         val container = FrameLayout(activity).apply {
             setBackgroundColor(bgColor)
+            // Swallow touches: the app renders underneath while the splash is up, and a
+            // non-clickable overlay would let taps reach that invisible UI.
+            isClickable = true
+            isFocusable = true
         }
 
         val view = LottieAnimationView(activity).apply {

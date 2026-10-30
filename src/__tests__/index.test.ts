@@ -1,4 +1,4 @@
-import { requireNativeModule } from 'expo';
+import { requireOptionalNativeModule } from 'expo';
 import React from 'react';
 import { act, create } from 'react-test-renderer';
 
@@ -9,15 +9,15 @@ import { hideAsync, isVisible, useHideAnimation } from '../index';
 // outer-scope const — that const would still be `undefined` at hoist time.
 // Instead, everything the native module needs is created fresh inside the
 // factory, and the real instance is recovered afterwards via
-// `requireNativeModule`'s mock.results.
+// `requireOptionalNativeModule`'s mock.results.
 jest.mock('expo', () => ({
-  requireNativeModule: jest.fn(() => ({
+  requireOptionalNativeModule: jest.fn(() => ({
     hideAsync: jest.fn().mockResolvedValue(undefined),
     isVisible: jest.fn().mockReturnValue(true),
   })),
 }));
 
-const nativeModule = (requireNativeModule as jest.Mock).mock.results[0].value as {
+const nativeModule = (requireOptionalNativeModule as jest.Mock).mock.results[0].value as {
   hideAsync: jest.Mock;
   isVisible: jest.Mock;
 };
@@ -114,5 +114,17 @@ describe('useHideAnimation', () => {
     });
     expect(animate).toHaveBeenCalledTimes(1);
     expect(nativeModule.hideAsync).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('without the native module (Expo Go, web)', () => {
+  it('imports without throwing and reports the splash as hidden', async () => {
+    let api: typeof import('../index') | undefined;
+    jest.isolateModules(() => {
+      require('expo').requireOptionalNativeModule.mockReturnValueOnce(null);
+      api = require('../index');
+    });
+    expect(api!.isVisible()).toBe(false);
+    await expect(api!.hideAsync()).resolves.toBeUndefined();
   });
 });

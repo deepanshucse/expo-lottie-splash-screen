@@ -1,8 +1,19 @@
-import { requireNativeModule } from 'expo';
+import { requireOptionalNativeModule } from 'expo';
 import { useEffect, useRef, useState } from 'react';
 import { Animated } from 'react-native';
 
-const NativeModule = requireNativeModule('ExpoLottieSplashScreen');
+interface NativeLottieSplashScreen {
+  hideAsync(fade: boolean): Promise<void>;
+  isVisible(): boolean;
+}
+
+// Optional so importing the package doesn't throw where the native module isn't
+// built in (Expo Go, web, tests): there is no splash there, so it acts as hidden.
+const NativeModule: NativeLottieSplashScreen =
+  requireOptionalNativeModule<NativeLottieSplashScreen>('ExpoLottieSplashScreen') ?? {
+    hideAsync: async () => {},
+    isVisible: () => false,
+  };
 
 export interface HideOptions {
   /**
