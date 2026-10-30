@@ -22,6 +22,10 @@ describe('injectMainActivityImport', () => {
     );
   });
 
+  it('throws if there is no package declaration', () => {
+    expect(() => injectMainActivityImport('class Foo\n')).toThrow(/package/);
+  });
+
   it('is idempotent', () => {
     const once = injectMainActivityImport(MAIN_ACTIVITY);
     const twice = injectMainActivityImport(once);
@@ -48,7 +52,7 @@ describe('injectMainActivityShowCall', () => {
       backgroundColor: '#FF0000',
     });
     expect(result).toContain(
-      'LottieSplashScreenManager.show(this, "lottie_splash", true, false, "#FF0000")'
+      'LottieSplashScreenManager.show(this, "lottie_splash", true, false, "#FF0000", savedInstanceState != null)'
     );
   });
 
@@ -59,8 +63,7 @@ describe('injectMainActivityShowCall', () => {
     expect(twice.match(/LottieSplashScreenManager\.show\(/g)).toHaveLength(1);
   });
 
-  it('leaves source untouched if onCreate is not found', () => {
-    const src = 'class Foo\n';
-    expect(injectMainActivityShowCall(src, options)).toBe(src);
+  it('throws if onCreate is not found instead of silently skipping', () => {
+    expect(() => injectMainActivityShowCall('class Foo\n', options)).toThrow(/onCreate/);
   });
 });

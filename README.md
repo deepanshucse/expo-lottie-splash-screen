@@ -74,7 +74,6 @@ npx expo install expo-lottie-splash-screen
 | `expo` | `*` |
 | `react` | `*` |
 | `react-native` | `*` |
-| `@expo/config-plugins` | `*` |
 
 ---
 
@@ -116,7 +115,8 @@ my-app/
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `animationFile` | `string` | **required** | Relative path from project root to the Lottie `.json` file |
-| `backgroundColor` | `string` | `"#ffffff"` | Solid background colour painted behind the animation on all Android versions and iOS |
+| `backgroundColor` | `string` | `"#FFFFFF"` | Solid background colour painted behind the animation on all Android versions and iOS. Hex: `#RGB`, `#RRGGBB` or `#AARRGGBB` |
+| `darkBackgroundColor` | `string` | same as `backgroundColor` | Background colour used while the device is in dark mode |
 | `autoHide` | `boolean` | `false` | If `true`, the splash hides automatically when the animation ends — no JS code needed |
 
 ### 3. Run prebuild
@@ -129,6 +129,7 @@ The plugin automatically patches:
 
 **Android**
 - Copies `lottie_splash.json` → `android/app/src/main/res/raw/`
+- Adds a `lottie_splash_background` colour to `colors.xml` (and `values-night/colors.xml` when `darkBackgroundColor` is set)
 - Overrides `Theme.App.SplashScreen` with your `backgroundColor` (removes `splashscreen_logo` on all API levels)
 - Creates `BootTheme` extending `Theme.SplashScreen` with `windowSplashScreenAnimatedIcon = transparent` (removes logo on Android 12+)
 - Sets the activity `android:theme` to `@style/BootTheme` in `AndroidManifest.xml`
@@ -345,13 +346,17 @@ On Android 12+ the system SplashScreen API shows briefly before our Lottie overl
 - `windowSplashScreenAnimatedIcon` is set to `@android:color/transparent` (removes the Expo logo icon)
 - The activity theme is set to `BootTheme` so `installSplashScreen()` reads these values
 
+### Using alongside `expo-splash-screen`
+
+You don't need `expo-splash-screen` — this library replaces it. If it's installed anyway (for example, another package depends on it), both libraries install the Android splash screen on the same activity. `expo-splash-screen` holds the window until React Native renders its first screen, so on Android the Lottie animation starts **after** your first screen is ready instead of before the JS bundle loads. Everything still works — the animation still plays in full and `hideAsync()` still resolves — it just starts later. Remove `expo-splash-screen` to get the earliest possible start.
+
 ---
 
 ## Platform requirements
 
 | Platform | Minimum version |
 |---|---|
-| Android | API 21 (Android 5.0 Lollipop) |
+| Android | API 24 (Android 7.0), the minimum for current React Native |
 | iOS | 14.0 |
 
 ### Native dependencies (auto-resolved)
@@ -385,6 +390,7 @@ expo-lottie-splash-screen/
 │   └── ExpoLottieSplashScreen.podspec
 ├── plugin/
 │   └── src/
+│       ├── utils.ts                     # Shared option defaults + colour validation
 │       ├── withAndroid.ts               # Android Config Plugin
 │       └── withIOS.ts                   # iOS Config Plugin
 ├── app.plugin.js                        # Plugin entry point
@@ -404,7 +410,8 @@ expo-lottie-splash-screen/
 ### Build the library
 
 ```bash
-npm run build:all
+npm run build:all     # one-off build of the library and the config plugin
+npm run build:watch   # rebuild the library on change
 ```
 
 ### Run TypeScript checks

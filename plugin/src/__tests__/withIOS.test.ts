@@ -83,6 +83,15 @@ describe('injectAppDelegateImport', () => {
     expect(result).toContain('import React\ninternal import ExpoLottieSplashScreen\n');
   });
 
+  it('falls back to an access-level import when there are no plain imports', () => {
+    const result = injectAppDelegateImport('internal import Expo\n\nclass AppDelegate {}\n');
+    expect(result).toContain('internal import Expo\ninternal import ExpoLottieSplashScreen\n');
+  });
+
+  it('throws if the file has no imports', () => {
+    expect(() => injectAppDelegateImport('class AppDelegate {}\n')).toThrow(/import/);
+  });
+
   it('is idempotent', () => {
     const once = injectAppDelegateImport(SDK57_APP_DELEGATE);
     const twice = injectAppDelegateImport(once);
@@ -137,8 +146,18 @@ describe('injectAppDelegateShowCall', () => {
     expect(twice.match(/LottieSplashScreenManager\.show\(/g)).toHaveLength(1);
   });
 
-  it('leaves source untouched if no matching function is found', () => {
-    const src = 'class Foo {}\n';
-    expect(injectAppDelegateShowCall(src, options)).toBe(src);
+  it('passes darkBackgroundColor only when set', () => {
+    expect(injectAppDelegateShowCall(SDK57_APP_DELEGATE, options)).not.toContain(
+      'darkBackgroundColor'
+    );
+    expect(
+      injectAppDelegateShowCall(SDK57_APP_DELEGATE, { ...options, darkBackgroundColor: '#000000' })
+    ).toContain('backgroundColor: "#1A1A2E", darkBackgroundColor: "#000000")');
+  });
+
+  it('throws if no matching function is found instead of silently skipping', () => {
+    expect(() => injectAppDelegateShowCall('class Foo {}\n', options)).toThrow(
+      /didFinishLaunchingWithOptions/
+    );
   });
 });

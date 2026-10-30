@@ -94,8 +94,11 @@ export function useHideAnimation(config: UseHideAnimationConfig) {
       hasRun.current = true;
       if (isVisible()) {
         // Native splash is showing — hide it first, then run JS transition.
-        hideAsync({ fade: false }).then(() => {
-          animateRef.current();
+        // animate() runs even if hiding fails, so the JS overlay can't get stuck.
+        const runAnimate = () => animateRef.current();
+        hideAsync({ fade: false }).then(runAnimate, (error) => {
+          console.warn('[expo-lottie-splash-screen] hideAsync failed:', error);
+          runAnimate();
         });
       } else {
         // Native splash already gone (e.g. Metro JS reload).

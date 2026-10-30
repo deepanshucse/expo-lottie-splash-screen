@@ -11,12 +11,7 @@ class ExpoLottieSplashScreenModule : Module() {
         // Hide the splash screen, optionally with a fade-out.
         // Resolves the promise once the animation is removed.
         AsyncFunction("hideAsync") { fade: Boolean, promise: Promise ->
-            val activity = appContext.currentActivity
-            if (activity == null) {
-                promise.reject("ERR_NO_ACTIVITY", "Activity is not available.", null)
-                return@AsyncFunction
-            }
-            LottieSplashScreenManager.hide(activity, fade) {
+            LottieSplashScreenManager.hide(fade) {
                 promise.resolve(null)
             }
         }

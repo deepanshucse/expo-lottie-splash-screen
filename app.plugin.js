@@ -9,20 +9,22 @@
  *   iOS:     copies Lottie JSON to app bundle, patches AppDelegate.swift
  */
 
-const { createRunOncePlugin } = require('@expo/config-plugins');
+const { createRunOncePlugin } = require('expo/config-plugins');
+
+const pkg = require('./package.json');
 const { withAndroidLottieSplash } = require('./plugin/build/withAndroid');
 const { withIosLottieSplash } = require('./plugin/build/withIOS');
 
 /**
  * @typedef {Object} PluginOptions
  * @property {string}  animationFile        - Path to the Lottie JSON file (relative to project root). Required.
- * @property {string}  [backgroundColor]    - Splash background color in hex. Default: '#ffffff'.
- * @property {string}  [darkBackgroundColor]- Dark-mode background color in hex. Optional.
+ * @property {string}  [backgroundColor]    - Splash background color in hex (#RGB, #RRGGBB, #AARRGGBB). Default: '#FFFFFF'.
+ * @property {string}  [darkBackgroundColor]- Background color used in dark mode. Optional; defaults to backgroundColor.
  * @property {boolean} [autoHide]           - Hide automatically when animation ends. Default: false.
  */
 
 /**
- * @type {import('@expo/config-plugins').ConfigPlugin<PluginOptions>}
+ * @type {import('expo/config-plugins').ConfigPlugin<PluginOptions>}
  */
 const withLottieSplashScreen = (config, options = {}) => {
   if (!options.animationFile) {
@@ -38,8 +40,4 @@ const withLottieSplashScreen = (config, options = {}) => {
   return config;
 };
 
-module.exports = createRunOncePlugin(
-  withLottieSplashScreen,
-  'expo-lottie-splash-screen',
-  '0.1.0'
-);
+module.exports = createRunOncePlugin(withLottieSplashScreen, pkg.name, pkg.version);

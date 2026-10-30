@@ -78,6 +78,21 @@ describe('useHideAnimation', () => {
     expect(animate).toHaveBeenCalledTimes(1);
   });
 
+  it('still runs animate() if hideAsync rejects', async () => {
+    nativeModule.isVisible.mockReturnValue(true);
+    nativeModule.hideAsync.mockRejectedValueOnce(new Error('boom'));
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const animate = jest.fn();
+
+    await act(async () => {
+      create(React.createElement(TestComponent, { ready: true, animate }));
+    });
+
+    expect(animate).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
   it('does not run until ready flips to true, and only runs once', async () => {
     const animate = jest.fn();
     let renderer!: ReturnType<typeof create>;

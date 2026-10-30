@@ -6,15 +6,16 @@
   "types": "build/index.d.ts",
   "app.plugin": "app.plugin.js",
   "scripts": {
-    "build": "node internal/module_scripts/build.js",
+    "build": "tsc",
     "build:plugin": "tsc -p plugin/tsconfig.json",
+    "build:watch": "node internal/module_scripts/build.js",
     "build:all": "npm run build && npm run build:plugin",
     "clean": "node internal/module_scripts/clean.js",
     "lint": "eslint src/ plugin/src/",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p plugin/tsconfig.jest.json",
     "test": "node internal/module_scripts/test.js",
     "test:plugin": "node internal/module_scripts/test.js plugin",
-    "prepare": "npm run build:all",
+    "prepare": "node internal/module_scripts/prepare.js",
     "open:ios": "node internal/module_scripts/open-ios.js",
     "open:android": "node internal/module_scripts/open-android.js"
   },
@@ -60,7 +61,6 @@
     ]
   },
   "peerDependencies": {
-    "@expo/config-plugins": "*",
     "expo": "*",
     "react": "*",
     "react-native": "*"

@@ -3,17 +3,19 @@ plugins {
   id 'expo-module-gradle-plugin'
 }
 
+// Single source of truth for the version: package.json
+def packageJson = new groovy.json.JsonSlurper().parse(file("../package.json"))
+
 group = 'expo.modules.lottiesplashscreen'
-version = '0.1.0'
+version = packageJson.version
 
 android {
   namespace "expo.modules.lottiesplashscreen"
   defaultConfig {
     versionCode 1
-    versionName "0.1.0"
-    minSdkVersion 21
+    versionName packageJson.version
   }
-  lintOptions {
+  lint {
     abortOnError false
   }
 }
