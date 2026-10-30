@@ -1,8 +1,19 @@
-import { requireNativeModule } from 'expo';
+import { requireOptionalNativeModule } from 'expo';
 import { useEffect, useRef, useState } from 'react';
 import { Animated } from 'react-native';
 
-const NativeModule = requireNativeModule('ExpoLottieSplashScreen');
+interface NativeLottieSplashScreen {
+  hideAsync(fade: boolean): Promise<void>;
+  isVisible(): boolean;
+}
+
+// Optional so importing the package doesn't throw where the native module isn't
+// built in (Expo Go, web, tests): there is no splash there, so it acts as hidden.
+const NativeModule: NativeLottieSplashScreen =
+  requireOptionalNativeModule<NativeLottieSplashScreen>('ExpoLottieSplashScreen') ?? {
+    hideAsync: async () => {},
+    isVisible: () => false,
+  };
 
 export interface HideOptions {
   /**
@@ -94,8 +105,11 @@ export function useHideAnimation(config: UseHideAnimationConfig) {
       hasRun.current = true;
       if (isVisible()) {
         // Native splash is showing — hide it first, then run JS transition.
-        hideAsync({ fade: false }).then(() => {
-          animateRef.current();
+        // animate() runs even if hiding fails, so the JS overlay can't get stuck.
+        const runAnimate = () => animateRef.current();
+        hideAsync({ fade: false }).then(runAnimate, (error) => {
+          console.warn('[expo-lottie-splash-screen] hideAsync failed:', error);
+          runAnimate();
         });
       } else {
         // Native splash already gone (e.g. Metro JS reload).

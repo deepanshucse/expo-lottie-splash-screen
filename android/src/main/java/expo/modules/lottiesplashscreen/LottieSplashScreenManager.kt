@@ -4,107 +4,136 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.app.Activity
 import android.graphics.Color
-import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.view.animation.AlphaAnimation
 import android.widget.FrameLayout
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.airbnb.lottie.LottieAnimationView
 import com.airbnb.lottie.LottieDrawable
 
 object LottieSplashScreenManager {
 
+    private const val TAG = "LottieSplashScreen"
+    private const val FADE_DURATION_MS = 300L
+
+    /** Colour resource written by the config plugin (has a values-night variant for dark mode). */
+    private const val BACKGROUND_COLOR_RESOURCE = "lottie_splash_background"
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    // All mutable state below is only read and written on the main thread, so the
+    // "is the animation done? → queue the hide" check can't race the animation ending.
     private var containerView: FrameLayout? = null
-    @Volatile private var visible = false
+    private var lottieView: LottieAnimationView? = null
+    private var focusListener: ViewTreeObserver.OnWindowFocusChangeListener? = null
+    private var playbackStarted = false
+    private var autoHide = false
 
     /**
-     * Whether the Lottie animation has completed at least one full play-through.
-     * Until this is true, any early hideAsync() call is queued and executed
-     * only after the animation finishes — so the splash is never cut short.
+     * Whether the Lottie animation has completed at least one full play-through
+     * (or failed to load). Until this is true, any early hideAsync() call is queued
+     * and executed only after the animation finishes — so the splash is never cut short.
      */
-    @Volatile private var animationCompleted = false
+    private var animationCompleted = false
 
     /** Queued hide request received before the animation finished. */
     private var pendingHide: (() -> Unit)? = null
 
+    /** Written on the main thread, read from the JS thread by isVisible(). */
+    @Volatile private var visible = false
+
     /**
-     * Called from MainActivity.onCreate() — injected by the Config Plugin.
+     * Called from MainActivity.onCreate() — injected by the Config Plugin. Must run on the
+     * main thread, before super.onCreate().
      *
      * @param backgroundColor Solid hex colour (#RRGGBB) painted behind the animation so
-     *                        any system splash / expo-splash-screen underneath is fully
-     *                        covered. Defaults to black if the string is unparseable.
+     *                        any system splash underneath is fully covered. Only used if the
+     *                        plugin's colour resource is missing; defaults to black if unparseable.
+     * @param restored        `true` when the activity is being recreated (savedInstanceState
+     *                        != null). The app is already past launch, so no overlay is shown.
      */
+    @JvmOverloads
     fun show(
         activity: Activity,
         animationName: String,
         autoHide: Boolean,
         loop: Boolean,
-        backgroundColor: String = "#000000"
+        backgroundColor: String = "#000000",
+        restored: Boolean = false
     ) {
-        // Reset state for this show() call
+        // Always install, on every API level: it switches the activity from BootTheme to
+        // postSplashScreenTheme (AppTheme). Skipping it would leave a non-AppCompat theme.
+        val splashScreen = activity.installSplashScreen()
+
+        // Drop any overlay left over from a previous Activity instance (and resolve its
+        // pending hide) so it can't leak the old Activity or stay on screen.
+        flushPendingHide()
+        removeOverlay()
         animationCompleted = false
-        pendingHide = null
+        playbackStarted = false
+        this.autoHide = autoHide
 
-        val bgColor = try {
-            Color.parseColor(backgroundColor)
-        } catch (_: IllegalArgumentException) {
-            Color.BLACK
-        }
+        if (restored) return
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // Android 12+: wait for the system splash exit animation, then swap in Lottie
-            val splashScreen = activity.installSplashScreen()
-            splashScreen.setOnExitAnimationListener { provider ->
-                provider.remove()   // dismiss the system splash immediately
-                activity.runOnUiThread { showOverlay(activity, animationName, autoHide, loop, bgColor) }
-            }
-        } else {
-            // Android 5–11: show Lottie overlay directly on top of DecorView
-            activity.runOnUiThread { showOverlay(activity, animationName, autoHide, loop, bgColor) }
+        // The overlay is added (and `visible` set) synchronously, before JS can run, so a
+        // hideAsync() call can never arrive "before" the splash and be lost. Playback starts
+        // once the system splash goes away so the first frames aren't hidden behind it.
+        addOverlay(activity, animationName, loop, resolveBackgroundColor(activity, backgroundColor))
+
+        splashScreen.setOnExitAnimationListener { provider ->
+            provider.remove()
+            startPlayback()
         }
     }
 
-    private fun showOverlay(
-        activity: Activity,
-        animationName: String,
-        autoHide: Boolean,
-        loop: Boolean,
-        bgColor: Int
-    ) {
+    private fun resolveBackgroundColor(activity: Activity, fallback: String): Int {
+        val resId = activity.resources.getIdentifier(BACKGROUND_COLOR_RESOURCE, "color", activity.packageName)
+        if (resId != 0) return ContextCompat.getColor(activity, resId)
+        return try {
+            Color.parseColor(fallback)
+        } catch (_: IllegalArgumentException) {
+            Color.BLACK
+        }
+    }
+
+    private fun addOverlay(activity: Activity, animationName: String, loop: Boolean, bgColor: Int) {
         val container = FrameLayout(activity).apply {
             setBackgroundColor(bgColor)
+            // Swallow touches: the app renders underneath while the splash is up, and a
+            // non-clickable overlay would let taps reach that invisible UI.
+            isClickable = true
+            isFocusable = true
         }
 
-        val lottieView = LottieAnimationView(activity).apply {
-            val resId = activity.resources.getIdentifier(animationName, "raw", activity.packageName)
-            if (resId != 0) setAnimation(resId)
+        val view = LottieAnimationView(activity).apply {
             repeatCount = if (loop) LottieDrawable.INFINITE else 0
-            playAnimation()
+
+            // Without this, a malformed animation throws and crashes the app.
+            setFailureListener { error ->
+                Log.w(TAG, "Failed to load splash animation '$animationName'", error)
+                // Ignore failures from an overlay that has already been released.
+                if (lottieView === this) onAnimationFinished()
+            }
 
             addAnimatorListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
-                    animationCompleted = true
+                    onAnimationFinished()
+                }
 
-                    if (autoHide) {
-                        // autoHide: dismiss automatically when animation ends
-                        if (visible) {
-                            activity.runOnUiThread { dismissOverlay(fade = false, onDone = null) }
-                        }
-                    } else {
-                        // autoHide: false — check if JS called hide() before animation ended
-                        pendingHide?.let { pending ->
-                            pendingHide = null
-                            if (visible) {
-                                activity.runOnUiThread { pending() }
-                            }
-                        }
-                    }
+                // A looping animation never ends — treat the first full loop as "played".
+                override fun onAnimationRepeat(animation: Animator) {
+                    onAnimationFinished()
                 }
             })
         }
 
         container.addView(
-            lottieView,
+            view,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
@@ -120,25 +149,74 @@ object LottieSplashScreenManager {
             )
         )
 
+        // Fallback start: the exit listener above isn't called when the system shows no
+        // splash (e.g. some launch paths), but the window still gains focus.
+        val listener = ViewTreeObserver.OnWindowFocusChangeListener { hasFocus ->
+            if (hasFocus) startPlayback()
+        }
+        container.viewTreeObserver.addOnWindowFocusChangeListener(listener)
+
         containerView = container
+        lottieView = view
+        focusListener = listener
         visible = true
+
+        val resId = activity.resources.getIdentifier(animationName, "raw", activity.packageName)
+        if (resId != 0) {
+            view.setAnimation(resId)
+        } else {
+            Log.w(TAG, "Splash animation 'res/raw/$animationName' not found")
+            onAnimationFinished()
+        }
+    }
+
+    private fun startPlayback() {
+        val view = lottieView ?: return
+        if (playbackStarted) return
+        playbackStarted = true
+        if (!animationCompleted) view.playAnimation()
+    }
+
+    private fun onAnimationFinished() {
+        if (animationCompleted) return
+        animationCompleted = true
+        if (!visible) return
+
+        val pending = pendingHide
+        pendingHide = null
+        when {
+            pending != null -> pending()
+            autoHide -> dismissOverlay(fade = false, onDone = null)
+        }
     }
 
     /**
-     * Hides the splash screen.
+     * Hides the splash screen. Safe to call from any thread.
      *
      * If the Lottie animation hasn't completed yet, the hide is **queued** and
      * will execute automatically once the animation finishes — ensuring the
      * full animation always plays even if the app is ready early.
      */
-    fun hide(activity: Activity, fade: Boolean, onDone: (() -> Unit)?) {
-        if (!animationCompleted && visible) {
-            // Animation still running — queue the dismiss for after it ends.
-            // onDone is called then so the JS Promise resolves at the right time.
-            pendingHide = { dismissOverlay(fade, onDone) }
-        } else {
-            activity.runOnUiThread { dismissOverlay(fade, onDone) }
+    fun hide(fade: Boolean, onDone: (() -> Unit)?) {
+        mainHandler.post {
+            if (visible && !animationCompleted) {
+                // Animation still running — queue the dismiss for after it ends.
+                // onDone is called then so the JS Promise resolves at the right time.
+                val previous = pendingHide
+                pendingHide = {
+                    previous?.invoke()
+                    dismissOverlay(fade, onDone)
+                }
+            } else {
+                dismissOverlay(fade, onDone)
+            }
         }
+    }
+
+    private fun flushPendingHide() {
+        val pending = pendingHide ?: return
+        pendingHide = null
+        pending()
     }
 
     private fun dismissOverlay(fade: Boolean, onDone: (() -> Unit)?) {
@@ -148,27 +226,46 @@ object LottieSplashScreenManager {
             return
         }
 
-        // Mark hidden immediately to prevent concurrent double-dismiss
+        // Mark hidden immediately to prevent a double dismiss
         visible = false
-        containerView = null
-
-        // Stop the Lottie animation so the GPU thread stops rendering
-        (view.getChildAt(0) as? LottieAnimationView)?.cancelAnimation()
+        releaseViews()
 
         if (fade) {
             val anim = AlphaAnimation(1f, 0f).apply {
-                duration = 300
+                duration = FADE_DURATION_MS
                 fillAfter = false
             }
             view.startAnimation(anim)
             view.postDelayed({
                 (view.parent as? ViewGroup)?.removeView(view)
                 onDone?.invoke()
-            }, 300)
+            }, FADE_DURATION_MS)
         } else {
             (view.parent as? ViewGroup)?.removeView(view)
             onDone?.invoke()
         }
+    }
+
+    /** Immediately removes any overlay without animation. */
+    private fun removeOverlay() {
+        val view = containerView ?: return
+        visible = false
+        releaseViews()
+        (view.parent as? ViewGroup)?.removeView(view)
+    }
+
+    /** Stops the animation and drops every reference to the overlay (and so to its Activity). */
+    private fun releaseViews() {
+        focusListener?.let { listener ->
+            containerView?.viewTreeObserver?.takeIf { it.isAlive }?.removeOnWindowFocusChangeListener(listener)
+        }
+        lottieView?.apply {
+            removeAllAnimatorListeners()
+            cancelAnimation()
+        }
+        containerView = null
+        lottieView = null
+        focusListener = null
     }
 
     fun isVisible(): Boolean = visible

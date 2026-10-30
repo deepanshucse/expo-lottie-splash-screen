@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,8 +8,17 @@ import {
   View,
 } from 'react-native';
 import { hideAsync, isVisible, useHideAnimation } from 'expo-lottie-splash-screen';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 export default function App() {
+  return (
+    <SafeAreaProvider>
+      <Main />
+    </SafeAreaProvider>
+  );
+}
+
+function Main() {
   const [appReady, setAppReady] = useState(false);
   const [status, setStatus] = useState('Splash is showing…');
   const [log, setLog] = useState<string[]>([]);
@@ -46,7 +54,7 @@ export default function App() {
   const overlayOpacity = useRef(new Animated.Value(isVisible() ? 1 : 0)).current;
   const [showJsOverlay, setShowJsOverlay] = useState(isVisible());
 
-  const { opacity } = useHideAnimation({
+  useHideAnimation({
     ready: appReady,
     animate: () => {
       addLog('Running JS exit animation…');
