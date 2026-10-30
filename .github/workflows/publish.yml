@@ -15,13 +15,14 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           registry-url: https://registry.npmjs.org
 
-      # Trusted Publishing (OIDC) requires npm >= 11.5.1; setup-node's bundled
-      # npm on node 20 is older than that.
-      - run: npm install -g npm@latest
+      # Trusted Publishing (OIDC) requires npm >= 11.5.1. Pinned to the 11.x line
+      # rather than @latest so a new npm major (e.g. one that drops this Node
+      # version) can't break releases.
+      - run: npm install -g npm@^11.5.1
 
       - run: npm ci
 
