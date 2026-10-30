@@ -1,6 +1,6 @@
 {
   "name": "expo-lottie-splash-screen",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Native Lottie splash screen for Expo — Android & iOS",
   "main": "build/index.js",
   "types": "build/index.d.ts",
